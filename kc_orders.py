@@ -4,6 +4,7 @@ from kiteconnect import KiteConnect
 
 import pandas as pd
 import datetime 
+from kiteconnect import KiteTicker
 
 
 
@@ -13,6 +14,9 @@ access_token = open("access_token.txt",'r').read()
 key_secret = open("api_key.txt",'r').read().split()
 kite = KiteConnect(api_key=key_secret[0])
 kite.set_access_token(access_token)
+
+kws = KiteTicker(key_secret[0],kite.access_token)
+
 
 
 
@@ -56,17 +60,30 @@ def createListOfStrickPrices(currentPrice,noofsrticks,strickdifference):
     return strickprices
 
 
+instrument_df = pd.DataFrame(kite.instruments())
+dataframeofOptions = instrument_df[(instrument_df['name'] =='NIFTY') & (instrument_df['expiry'] == next_Thrusdayweekday(datetime.date.today(),3)) & (instrument_df['strike'].isin(createListOfStrickPrices(roundOffvalue(niftyCurrentPrice,50),10,50)))]
+instrumentsTokenList = dataframeofOptions['instrument_token'].tolist()
 
 
 
+def on_ticks(ws,ticks):
+    # Callback to receive ticks.
+    #logging.debug("Ticks: {}".format(ticks))
+    print(ticks)
 
+def on_connect(ws,response):
+    # Callback on successful connect.
+    # Subscribe to a list of instrument_tokens (RELIANCE and ACC here).
+    #logging.debug("on connect: {}".format(response))
+    ws.subscribe(instrumentsTokenList)
+    ws.set_mode(ws.MODE_FULL,instrumentsTokenList) # Set all token tick in `full` mode.
+  
+ 
 
-instrument_dump = kite.instruments()
-instrument_df = pd.DataFrame(instrument_dump)
-expiryDate = next_Thrusdayweekday(datetime.date.today(),3)
-listofStrickprices = createListOfStrickPrices(roundOffvalue(niftyCurrentPrice,50),10,50)
-print(listofStrickprices)
-dataframeofOptions = instrument_df[(instrument_df['name'] =='NIFTY') & (instrument_df['expiry'] == expiryDate) & (instrument_df['strike'].isin(listofStrickprices))]
+kws.on_ticks=on_ticks
+kws.on_connect=on_connect
+kws.connect()
+
 
 
 #nifty50TokenDF = instrument_df[instrument_df['name'] =='NIFTY 50']
